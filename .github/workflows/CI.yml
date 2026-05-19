@@ -1,4 +1,4 @@
-name: build and release
+name: 1
 on:
   push:
     tags: [ "v*" ]
@@ -15,8 +15,10 @@ jobs:
     steps:
       - name: Get repo files
         uses: actions/checkout@v6
+        with:
+          submodules: true
       - name: Configure build directory
-        run: cmake -H. -B build
+        run: cmake -H. -B build -D BUILD_TESTS=ON
       - name: Build project
         run: cmake --build build
       - name: Upload artifacts
@@ -24,8 +26,8 @@ jobs:
         with:
           name: Applications
           path: |
-            ./build/hello_world_application/hello_world
-            ./build/solver_application/solver
+            ./build/chat_room
+            ./build/check
 
   test:
     needs: build
@@ -39,71 +41,32 @@ jobs:
           path: ./apps
       - name: Fix permissions
         run: |
-          chmod +x ./apps/hello_world_application/hello_world
-          chmod +x ./apps/solver_application/solver
-      - name: Test hello_world
-        run: ./apps/hello_world_application/hello_world
-      - name: Test solver
-        run: echo "1 5 -6" | ./apps/solver_application/solver
+          chmod +x ./apps/chat_room
+          chmod +x ./apps/check
+      - name: run check_room
+        run: ./apps/chat_room
+      - name: GTest 
+        run: ./apps/check
 
   create-binary-packages:
     needs: test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Get repo files
         uses: actions/checkout@v6
-      - name: Install required dependencies Ubuntu
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm
-      - name: Set up DotNet Windows
-        if: matrix.os == 'windows-latest'
-        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.x'
-      - name: Install required dependencies Windows
-        if: matrix.os == 'windows-latest'
+          submodules: true
+      - name: Create packages
         run: |
-          dotnet tool install --global wix --version 4.0.0
-          wix extension add --global WixToolset.UI.wixext/4.0.4
-      - name: Configure build directory Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir build
-          cmake -B build
-      - name: Configure build directory Ubuntu and MacOS
-        if: matrix.os != 'windows-latest'
-        run: cmake -H. -B build
-      - name: Build project
-        run: cmake --build build --config Release
-      - name: Create packages DEB RPM
-        if: matrix.os == 'ubuntu-latest'
-        run: |
+          cmake -H. -B build -DCMAKE_BUILD_TYPE=Release -D BUILD_TEST=ON
+          cmake --build build
           cd build
           cpack -G DEB -C Release
-          cpack -G RPM -C Release
-      - name: Create packages DMG
-        if: matrix.os == 'macos-latest'
-        run: |
-          cd build
-          cpack -G DragNDrop -C Release
-      - name: Create packages MSI
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd build
-          cpack -G WIX -C Release
       - name: Upload binary packages
         uses: softprops/action-gh-release@v1
         with:
           files: |
             build/*.deb
-            build/*.rpm
-            build/*.dmg
-            build/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
