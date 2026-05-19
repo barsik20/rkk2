@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/check.dir/chat_room.cpp.o CMakeFiles/check.dir/tests/test.cpp.o -o check  lib/libgtest_main.a lib/libgtest.a 
